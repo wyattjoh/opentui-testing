@@ -1,10 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { useKeyboard } from "@opentui/react";
-import { useState, type ReactElement } from "react";
+import { useState, type ReactNode } from "react";
+import type { MockInput } from "@opentui/core/testing";
 
-import { keys, render } from "../src/index.ts";
+import {
+  applyEnv,
+  flushFrames,
+  keys,
+  render,
+  waitForFrame,
+  wrapInput,
+} from "../src/index.ts";
 
-function Hello(): ReactElement {
+function Hello(): ReactNode {
   return (
     <box flexDirection="column" padding={1} border>
       <text>Hello, OpenTUI!</text>
@@ -12,7 +20,7 @@ function Hello(): ReactElement {
   );
 }
 
-function Counter(): ReactElement {
+function Counter(): ReactNode {
   const [count, setCount] = useState(0);
   useKeyboard((key) => {
     if (key.name === "up") setCount((c) => c + 1);
@@ -25,10 +33,33 @@ function Counter(): ReactElement {
   );
 }
 
-function EnvDisplay(): ReactElement {
+function EnvDisplay(): ReactNode {
   return (
     <box flexDirection="column" padding={1} border>
       <text>MODE: {process.env.MODE ?? "unset"}</text>
+    </box>
+  );
+}
+
+function KeyLog(): ReactNode {
+  const [count, setCount] = useState(0);
+  const [last, setLast] = useState("none");
+  useKeyboard((key) => {
+    setCount((c) => c + 1);
+    setLast(key.name ?? "?");
+  });
+  return (
+    <box flexDirection="column" padding={1} border>
+      <text>count: {count}</text>
+      <text>last: {last}</text>
+    </box>
+  );
+}
+
+function ColorText(): ReactNode {
+  return (
+    <box flexDirection="column">
+      <text fg="#ff0000">RED</text>
     </box>
   );
 }
@@ -57,10 +88,14 @@ describe("render", () => {
     await cleanup();
   });
 
-  test("keys constants are exported", () => {
-    expect(keys.ARROW_UP).toBe("\x1B[A");
-    expect(keys.SPACE).toBe(" ");
-    expect(keys.RETURN).toBe("\r");
+  test("exposes the underlying renderer and mockMouse passthrough", async () => {
+    const { renderer, mockMouse, cleanup } = await render(<Hello />, { width: 30, height: 6 });
+    expect(renderer).toBeDefined();
+    expect(typeof renderer.destroy).toBe("function");
+    expect(mockMouse).toBeDefined();
+    expect(typeof mockMouse.click).toBe("function");
+    expect(typeof mockMouse.moveTo).toBe("function");
+    await cleanup();
   });
 
   test("applies env overrides during render and restores them on cleanup", async () => {
@@ -82,5 +117,186 @@ describe("render", () => {
     expect(process.env.FEATURE_FLAG).toBeUndefined();
 
     delete process.env.MODE;
+  });
+});
+
+describe("input", () => {
+  test("typeText fires one keypress per character", async () => {
+    const { input, captureCharFrame, waitForFrame, cleanup } = await render(<KeyLog />, {
+      width: 30,
+      height: 7,
+    });
+
+    await input.typeText("hi");
+    await waitForFrame((frame) => frame.includes("count: 2"));
+
+    expect(captureCharFrame()).toContain("count: 2");
+    await cleanup();
+  });
+
+  test("pressKey(keys.RETURN) emits a return key", async () => {
+    const { input, captureCharFrame, waitForFrame, cleanup } = await render(<KeyLog />, {
+      width: 30,
+      height: 7,
+    });
+
+    await input.pressKey(keys.RETURN);
+    await waitForFrame((frame) => frame.includes("last: return"));
+
+    const frame = captureCharFrame();
+    expect(frame).toContain("count: 1");
+    expect(frame).toContain("last: return");
+    await cleanup();
+  });
+});
+
+describe("flushFrames", () => {
+  test("bound form pumps n frames and keeps the renderer alive", async () => {
+    const { flushFrames: flush, captureCharFrame, cleanup } = await render(<Hello />, {
+      width: 30,
+      height: 6,
+    });
+    await flush(3);
+    expect(captureCharFrame()).toContain("Hello, OpenTUI!");
+    await cleanup();
+  });
+
+  test("standalone form drives renderOnce from an existing renderer", async () => {
+    const { renderOnce, captureCharFrame, cleanup } = await render(<Hello />, {
+      width: 30,
+      height: 6,
+    });
+    await flushFrames(renderOnce, 2);
+    expect(captureCharFrame()).toContain("Hello, OpenTUI!");
+    await cleanup();
+  });
+});
+
+describe("waitForFrame", () => {
+  test("standalone form pumps until predicate matches", async () => {
+    const { renderOnce, captureCharFrame, cleanup } = await render(<Counter />, {
+      width: 30,
+      height: 6,
+    });
+    const frame = await waitForFrame(renderOnce, captureCharFrame, (f) =>
+      f.includes("Count: 0"),
+    );
+    expect(frame).toContain("Count: 0");
+    await cleanup();
+  });
+
+  test("throws with the last captured frame when predicate never matches", async () => {
+    const { waitForFrame: waitFor, cleanup } = await render(<Hello />, {
+      width: 30,
+      height: 6,
+    });
+
+    await expect(
+      waitFor((frame) => frame.includes("not present"), { timeoutMs: 50, maxFrames: 4 }),
+    ).rejects.toThrow(/predicate did not match.*Hello, OpenTUI!/s);
+
+    await cleanup();
+  });
+});
+
+describe("resize", () => {
+  test("resize shrinks the captured frame dimensions", async () => {
+    const { resize, captureCharFrame, waitForFrame, cleanup } = await render(<Hello />, {
+      width: 80,
+      height: 24,
+    });
+
+    const beforeWidth = captureCharFrame().split("\n")[0]!.length;
+    expect(beforeWidth).toBeGreaterThanOrEqual(80);
+
+    resize(30, 6);
+    await waitForFrame(
+      (frame) =>
+        frame.split("\n")[0]!.length < beforeWidth && frame.includes("Hello, OpenTUI!"),
+    );
+
+    const after = captureCharFrame();
+    expect(after.split("\n")[0]!.length).toBeLessThanOrEqual(30);
+    expect(after).toContain("Hello, OpenTUI!");
+    await cleanup();
+  });
+});
+
+describe("captureSpans", () => {
+  test("returns per-cell color information for styled text", async () => {
+    const { captureSpans, cleanup } = await render(<ColorText />, { width: 10, height: 3 });
+
+    const frame = captureSpans();
+    expect(frame.cols).toBe(10);
+    expect(frame.rows).toBe(3);
+    expect(frame.lines.length).toBe(3);
+
+    const redSpan = frame.lines
+      .flatMap((line) => line.spans)
+      .find((span) => span.text === "RED");
+
+    expect(redSpan).toBeDefined();
+    expect(redSpan!.fg.r).toBeGreaterThan(0.9);
+    expect(redSpan!.fg.g).toBeLessThan(0.1);
+    expect(redSpan!.fg.b).toBeLessThan(0.1);
+    await cleanup();
+  });
+});
+
+describe("keys", () => {
+  test("re-exports KeyCodes plus SPACE alias", () => {
+    expect(keys.ARROW_UP).toBe("\x1B[A");
+    expect(keys.RETURN).toBe("\r");
+    expect(keys.SPACE).toBe(" ");
+  });
+});
+
+describe("wrapInput", () => {
+  test("wraps function fields as async and passes return values through", async () => {
+    const calls: unknown[][] = [];
+    const stub = {
+      pressKey: (...args: unknown[]) => {
+        calls.push(args);
+        return "ok";
+      },
+      label: "raw",
+    };
+
+    const wrapped = wrapInput(stub as unknown as MockInput);
+
+    const result = await (wrapped as unknown as {
+      pressKey: (s: string) => Promise<string>;
+    }).pressKey("\r");
+
+    expect(result).toBe("ok");
+    expect(calls).toEqual([["\r"]]);
+    expect((wrapped as unknown as { label: string }).label).toBe("raw");
+  });
+});
+
+describe("applyEnv", () => {
+  afterEach(() => {
+    delete process.env.OT_AAA;
+    delete process.env.OT_BBB;
+    delete process.env.OT_CCC;
+  });
+
+  test("applies overrides, unsets on undefined, and restores prior state", () => {
+    const read = (key: string): string | undefined => process.env[key];
+    process.env.OT_AAA = "before";
+    delete process.env.OT_BBB;
+    process.env.OT_CCC = "preserve";
+
+    const restore = applyEnv({ OT_AAA: "after", OT_BBB: "new", OT_CCC: undefined });
+
+    expect(read("OT_AAA")).toBe("after");
+    expect(read("OT_BBB")).toBe("new");
+    expect(read("OT_CCC")).toBeUndefined();
+
+    restore();
+
+    expect(read("OT_AAA")).toBe("before");
+    expect(read("OT_BBB")).toBeUndefined();
+    expect(read("OT_CCC")).toBe("preserve");
   });
 });
