@@ -1,0 +1,19 @@
+{
+  "name": "opentui-testing",
+  "version": "0.1.0",
+  "description": "Snapshot-friendly testing helpers for OpenTUI React apps under bun test, plus an agent skill that teaches Claude how to use them.",
+  "author": {
+    "name": "Wyatt Johnson"
+  },
+  "repository": "https://github.com/wyattjoh/opentui-testing",
+  "license": "MIT",
+  "keywords": [
+    "opentui",
+    "testing",
+    "snapshot",
+    "tui",
+    "react",
+    "bun",
+    "terminal"
+  ]
+}

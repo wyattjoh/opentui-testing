@@ -110,6 +110,32 @@ After any change in `src/`, repack and reinstall. Don't use `bun link`
 for this consumer: linking carries this package's own `node_modules/react`
 along, causing the "Invalid hook call / two React copies" error.
 
+## Claude Code plugin
+
+This repo also ships as a Claude Code plugin published to the
+`wyattjoh/claude-code-marketplace` registry. Layout:
+
+- `.claude-plugin/plugin.json` — plugin manifest (`name`, `version`,
+  `description`, `keywords`, `repository`, `license`). `version` is
+  bumped by release-please via the `extra-files` entry in
+  `release-please-config.json`, so npm + plugin versions stay locked.
+- `skills/opentui-testing/SKILL.md` — the agent skill the plugin
+  exposes. It's the same file the package documents in its README; the
+  plugin is the install vehicle for Claude Code users.
+- `.github/workflows/release.yml` — after a release-please release
+  creates a tag and the npm publish job succeeds, the
+  `update-marketplace` job calls `wyattjoh/claude-code-marketplace@v1`
+  to open a PR against the marketplace registry bumping
+  `opentui-testing`'s `version`, `source.ref`, and `source.sha`. That PR
+  is what makes the new release installable via
+  `/plugin install opentui-testing@wyattjoh-marketplace`.
+
+The marketplace action requires a pre-existing entry under
+`opentui-testing` in the registry's `marketplace.json`; first-time setup
+adds that entry manually. The `MARKETPLACE_PAT` secret on this repo must
+be a fine-grained PAT with `contents:write` + `pull-requests:write` on
+the marketplace repo.
+
 ## Anti-scope
 
 - Do not build a virtual terminal. OpenTUI's testing mode already
