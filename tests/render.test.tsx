@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { useKeyboard } from "@opentui/react";
 import { useState, type ReactNode } from "react";
+import { tmpdir } from "node:os";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import type { MockInput } from "@opentui/core/testing";
 
 import {
+  applyCwd,
   applyEnv,
   flushFrames,
   keys,
@@ -37,6 +41,14 @@ function EnvDisplay(): ReactNode {
   return (
     <box flexDirection="column" padding={1} border>
       <text>MODE: {process.env.MODE ?? "unset"}</text>
+    </box>
+  );
+}
+
+function CwdDisplay(): ReactNode {
+  return (
+    <box flexDirection="column" padding={1} border>
+      <text>CWD: {process.cwd()}</text>
     </box>
   );
 }
@@ -114,10 +126,66 @@ describe("render", () => {
     delete process.env.MODE;
   });
 
+  test("applies cwd override during render and restores it on dispose", async () => {
+    const originalCwd = process.cwd();
+    const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-render-cwd-")));
+
+    try {
+      {
+        await using rendered = await render(<CwdDisplay />, {
+          width: tmpDir.length + 20,
+          height: 5,
+          cwd: tmpDir,
+        });
+
+        expect(rendered.captureCharFrame()).toContain(`CWD: ${tmpDir}`);
+        expect(process.cwd()).toBe(tmpDir);
+      }
+
+      expect(process.cwd()).toBe(originalCwd);
+    } finally {
+      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   test("[Symbol.asyncDispose] is callable directly for mid-scope cleanup", async () => {
     const rendered = await render(<Hello />, { width: 30, height: 6 });
     expect(typeof rendered[Symbol.asyncDispose]).toBe("function");
     await rendered[Symbol.asyncDispose]();
+  });
+
+  test("cleanup() destroys the renderer, restores env/cwd, and is idempotent", async () => {
+    const originalCwd = process.cwd();
+    const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-cleanup-")));
+    process.env.MODE = "outer";
+
+    try {
+      const rendered = await render(<EnvDisplay />, {
+        width: 30,
+        height: 5,
+        env: { MODE: "inner" },
+        cwd: tmpDir,
+      });
+
+      expect(process.env.MODE).toBe("inner");
+      expect(process.cwd()).toBe(tmpDir);
+
+      await rendered.cleanup();
+
+      expect(process.env.MODE).toBe("outer");
+      expect(process.cwd()).toBe(originalCwd);
+
+      await rendered.cleanup();
+      await rendered[Symbol.asyncDispose]();
+
+      expect(process.env.MODE).toBe("outer");
+      expect(process.cwd()).toBe(originalCwd);
+    } finally {
+      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
+      delete process.env.MODE;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -275,5 +343,23 @@ describe("applyEnv", () => {
     expect(read("OT_AAA")).toBe("before");
     expect(read("OT_BBB")).toBeUndefined();
     expect(read("OT_CCC")).toBe("preserve");
+  });
+});
+
+describe("applyCwd", () => {
+  test("switches process.cwd() and restores it on the returned callback", () => {
+    const originalCwd = process.cwd();
+    const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-apply-cwd-")));
+
+    try {
+      const restore = applyCwd(tmpDir);
+      expect(process.cwd()).toBe(tmpDir);
+
+      restore();
+      expect(process.cwd()).toBe(originalCwd);
+    } finally {
+      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

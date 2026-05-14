@@ -15,6 +15,7 @@ export { keys, type Key } from "./keys.ts";
 export { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.ts";
 export { wrapInput, type Input } from "./input.ts";
 export { applyEnv, type EnvOverrides } from "./env.ts";
+export { applyCwd } from "./cwd.ts";
 
 /**
  * Upstream OpenTUI testing types re-exported for convenience so consumers
