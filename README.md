@@ -17,6 +17,21 @@ Peer dependencies (you almost certainly already have these):
 bun add @opentui/core @opentui/react react
 ```
 
+## Claude Code skill
+
+This repo also ships a Claude Code skill (`skills/opentui-testing/`)
+that teaches the agent how to write `bun test` suites against OpenTUI
+React apps with this package: frame quiescence, keyboard input, `env` /
+`cwd` overrides, snapshot recipes, and common debugging flows. Install
+it into your Claude Code setup with:
+
+```sh
+bunx skills add https://github.com/wyattjoh/opentui-testing --skill opentui-testing
+```
+
+The skill is source-controlled alongside the package so the two stay in
+lockstep across releases.
+
 ## Usage
 
 ```tsx
