@@ -19,18 +19,20 @@ bun add @opentui/core @opentui/react react
 
 ## Agent testing skill
 
-This repo also ships an agent testing skill (`skills/opentui-testing/`)
-that teaches the agent how to write `bun test` suites against OpenTUI
+This repo also ships a Claude Code plugin (`.claude-plugin/plugin.json`)
+that bundles an agent testing skill (`skills/opentui-testing/`). The
+skill teaches the agent how to write `bun test` suites against OpenTUI
 React apps with this package: frame quiescence, keyboard input, `env` /
 `cwd` overrides, snapshot recipes, and common debugging flows. Install
-it into your Claude Code setup with:
+it through Claude Code's plugin marketplace:
 
-```sh
-bunx skills add https://github.com/wyattjoh/opentui-testing --skill opentui-testing
+```text
+/plugin marketplace add wyattjoh/claude-code-marketplace
+/plugin install opentui-testing@wyattjoh-marketplace
 ```
 
-The skill is source-controlled alongside the package so the two stay in
-lockstep across releases.
+The plugin and skill are source-controlled alongside the package so the
+two stay in lockstep across releases.
 
 ## Usage
 
