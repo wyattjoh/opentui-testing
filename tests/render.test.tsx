@@ -78,13 +78,13 @@ function ColorText(): ReactNode {
 
 describe("render", () => {
   test("captures initial frame as snapshot", async () => {
-    await using rendered = await render(<Hello />, { width: 30, height: 6 });
-    expect(rendered.captureCharFrame()).toMatchSnapshot();
+    await using hello = await render(<Hello />, { width: 30, height: 6 });
+    expect(hello.captureCharFrame()).toMatchSnapshot();
   });
 
   test("snapshots state after keyboard interaction", async () => {
-    await using rendered = await render(<Counter />, { width: 30, height: 6 });
-    const { input, captureCharFrame, waitForFrame } = rendered;
+    await using counter = await render(<Counter />, { width: 30, height: 6 });
+    const { input, captureCharFrame, waitForFrame } = counter;
 
     expect(captureCharFrame()).toContain("Count: 0");
 
@@ -97,25 +97,25 @@ describe("render", () => {
   });
 
   test("exposes the underlying renderer and mockMouse passthrough", async () => {
-    await using rendered = await render(<Hello />, { width: 30, height: 6 });
-    expect(rendered.renderer).toBeDefined();
-    expect(typeof rendered.renderer.destroy).toBe("function");
-    expect(rendered.mockMouse).toBeDefined();
-    expect(typeof rendered.mockMouse.click).toBe("function");
-    expect(typeof rendered.mockMouse.moveTo).toBe("function");
+    await using hello = await render(<Hello />, { width: 30, height: 6 });
+    expect(hello.renderer).toBeDefined();
+    expect(typeof hello.renderer.destroy).toBe("function");
+    expect(hello.mockMouse).toBeDefined();
+    expect(typeof hello.mockMouse.click).toBe("function");
+    expect(typeof hello.mockMouse.moveTo).toBe("function");
   });
 
   test("applies env overrides during render and restores them on dispose", async () => {
     process.env.MODE = "outer";
 
     {
-      await using rendered = await render(<EnvDisplay />, {
+      await using envDisplay = await render(<EnvDisplay />, {
         width: 30,
         height: 5,
         env: { MODE: "inner", FEATURE_FLAG: "1" },
       });
 
-      expect(rendered.captureCharFrame()).toContain("MODE: inner");
+      expect(envDisplay.captureCharFrame()).toContain("MODE: inner");
       expect(process.env.MODE).toBe("inner");
       expect(process.env.FEATURE_FLAG).toBe("1");
     }
@@ -132,13 +132,13 @@ describe("render", () => {
 
     try {
       {
-        await using rendered = await render(<CwdDisplay />, {
+        await using cwdDisplay = await render(<CwdDisplay />, {
           width: tmpDir.length + 20,
           height: 5,
           cwd: tmpDir,
         });
 
-        expect(rendered.captureCharFrame()).toContain(`CWD: ${tmpDir}`);
+        expect(cwdDisplay.captureCharFrame()).toContain(`CWD: ${tmpDir}`);
         expect(process.cwd()).toBe(tmpDir);
       }
 
@@ -150,9 +150,9 @@ describe("render", () => {
   });
 
   test("[Symbol.asyncDispose] is callable directly for mid-scope cleanup", async () => {
-    const rendered = await render(<Hello />, { width: 30, height: 6 });
-    expect(typeof rendered[Symbol.asyncDispose]).toBe("function");
-    await rendered[Symbol.asyncDispose]();
+    const hello = await render(<Hello />, { width: 30, height: 6 });
+    expect(typeof hello[Symbol.asyncDispose]).toBe("function");
+    await hello[Symbol.asyncDispose]();
   });
 
   test("restores env when applyCwd throws on a nonexistent path", async () => {
@@ -183,7 +183,7 @@ describe("render", () => {
     process.env.MODE = "outer";
 
     try {
-      const rendered = await render(<EnvDisplay />, {
+      const envDisplay = await render(<EnvDisplay />, {
         width: 30,
         height: 5,
         env: { MODE: "inner" },
@@ -193,13 +193,13 @@ describe("render", () => {
       expect(process.env.MODE).toBe("inner");
       expect(process.cwd()).toBe(tmpDir);
 
-      await rendered.cleanup();
+      await envDisplay.cleanup();
 
       expect(process.env.MODE).toBe("outer");
       expect(process.cwd()).toBe(originalCwd);
 
-      await rendered.cleanup();
-      await rendered[Symbol.asyncDispose]();
+      await envDisplay.cleanup();
+      await envDisplay[Symbol.asyncDispose]();
 
       expect(process.env.MODE).toBe("outer");
       expect(process.cwd()).toBe(originalCwd);
@@ -213,8 +213,8 @@ describe("render", () => {
 
 describe("input", () => {
   test("typeText fires one keypress per character", async () => {
-    await using rendered = await render(<KeyLog />, { width: 30, height: 7 });
-    const { input, captureCharFrame, waitForFrame } = rendered;
+    await using keyLog = await render(<KeyLog />, { width: 30, height: 7 });
+    const { input, captureCharFrame, waitForFrame } = keyLog;
 
     await input.typeText("hi");
     await waitForFrame((frame) => frame.includes("count: 2"));
@@ -223,8 +223,8 @@ describe("input", () => {
   });
 
   test("pressKey(keys.RETURN) emits a return key", async () => {
-    await using rendered = await render(<KeyLog />, { width: 30, height: 7 });
-    const { input, captureCharFrame, waitForFrame } = rendered;
+    await using keyLog = await render(<KeyLog />, { width: 30, height: 7 });
+    const { input, captureCharFrame, waitForFrame } = keyLog;
 
     await input.pressKey(keys.RETURN);
     await waitForFrame((frame) => frame.includes("last: return"));
@@ -237,32 +237,32 @@ describe("input", () => {
 
 describe("flushFrames", () => {
   test("bound form pumps n frames and keeps the renderer alive", async () => {
-    await using rendered = await render(<Hello />, { width: 30, height: 6 });
-    await rendered.flushFrames(3);
-    expect(rendered.captureCharFrame()).toContain("Hello, OpenTUI!");
+    await using hello = await render(<Hello />, { width: 30, height: 6 });
+    await hello.flushFrames(3);
+    expect(hello.captureCharFrame()).toContain("Hello, OpenTUI!");
   });
 
   test("standalone form drives renderOnce from an existing renderer", async () => {
-    await using rendered = await render(<Hello />, { width: 30, height: 6 });
-    await flushFrames(rendered.renderOnce, 2);
-    expect(rendered.captureCharFrame()).toContain("Hello, OpenTUI!");
+    await using hello = await render(<Hello />, { width: 30, height: 6 });
+    await flushFrames(hello.renderOnce, 2);
+    expect(hello.captureCharFrame()).toContain("Hello, OpenTUI!");
   });
 });
 
 describe("waitForFrame", () => {
   test("standalone form pumps until predicate matches", async () => {
-    await using rendered = await render(<Counter />, { width: 30, height: 6 });
-    const frame = await waitForFrame(rendered.renderOnce, rendered.captureCharFrame, (f) =>
+    await using counter = await render(<Counter />, { width: 30, height: 6 });
+    const frame = await waitForFrame(counter.renderOnce, counter.captureCharFrame, (f) =>
       f.includes("Count: 0"),
     );
     expect(frame).toContain("Count: 0");
   });
 
   test("throws with the last captured frame when predicate never matches", async () => {
-    await using rendered = await render(<Hello />, { width: 30, height: 6 });
+    await using hello = await render(<Hello />, { width: 30, height: 6 });
 
     await expect(
-      rendered.waitForFrame((frame) => frame.includes("not present"), {
+      hello.waitForFrame((frame) => frame.includes("not present"), {
         timeoutMs: 50,
         maxFrames: 4,
       }),
@@ -272,8 +272,8 @@ describe("waitForFrame", () => {
 
 describe("resize", () => {
   test("resize shrinks the captured frame dimensions", async () => {
-    await using rendered = await render(<Hello />, { width: 80, height: 24 });
-    const { resize, captureCharFrame, waitForFrame } = rendered;
+    await using hello = await render(<Hello />, { width: 80, height: 24 });
+    const { resize, captureCharFrame, waitForFrame } = hello;
 
     const beforeWidth = captureCharFrame().split("\n")[0]!.length;
     expect(beforeWidth).toBeGreaterThanOrEqual(80);
@@ -292,9 +292,9 @@ describe("resize", () => {
 
 describe("captureSpans", () => {
   test("returns per-cell color information for styled text", async () => {
-    await using rendered = await render(<ColorText />, { width: 10, height: 3 });
+    await using colorText = await render(<ColorText />, { width: 10, height: 3 });
 
-    const frame = rendered.captureSpans();
+    const frame = colorText.captureSpans();
     expect(frame.cols).toBe(10);
     expect(frame.rows).toBe(3);
     expect(frame.lines.length).toBe(3);

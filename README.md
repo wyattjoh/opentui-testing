@@ -41,13 +41,13 @@ import { App } from "./app.tsx";
 
 describe("App", () => {
   test("captures state after interaction", async () => {
-    await using rendered = await render(<App />, {
+    await using app = await render(<App />, {
       width: 80,
       height: 24,
       env: { FEATURE_FLAG: "1" },
       cwd: "/tmp/fixture",
     });
-    const { input, captureCharFrame, waitForFrame } = rendered;
+    const { input, captureCharFrame, waitForFrame } = app;
 
     await input.pressArrow("down");
     await input.pressArrow("down");
@@ -63,7 +63,7 @@ describe("App", () => {
 `[Symbol.asyncDispose]()` when the binding leaves scope, which destroys the
 renderer inside `act()` and restores any `env` / `cwd` overrides. To dispose
 manually (e.g. from an `afterEach` hook, or in environments without `await
-using`), call `await rendered.cleanup()`. Both forms are idempotent.
+using`), call `await app.cleanup()`. Both forms are idempotent.
 
 ## API
 
