@@ -1,0 +1,55 @@
+{
+  "name": "@wyattjoh/opentui-testing",
+  "version": "0.1.0",
+  "description": "Snapshot-friendly testing helpers for OpenTUI React apps under bun test",
+  "keywords": [
+    "opentui",
+    "testing",
+    "snapshot",
+    "tui",
+    "react",
+    "bun",
+    "terminal"
+  ],
+  "author": "Wyatt Johnson <wyattjoh@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/wyattjoh/opentui-testing#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wyattjoh/opentui-testing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wyattjoh/opentui-testing/issues"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test",
+    "check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@opentui/core": "^0.2.7",
+    "@opentui/react": "^0.2.7",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@opentui/core": "0.2.7",
+    "@opentui/react": "0.2.7",
+    "@types/bun": "latest",
+    "@types/react": "19.2.14",
+    "react": "19.2.6",
+    "typescript": "^5.6.0"
+  }
+}

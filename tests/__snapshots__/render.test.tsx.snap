@@ -1,0 +1,21 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`render captures initial frame as snapshot 1`] = `
+"┌────────────────────────────┐
+│                            │
+│ Hello, OpenTUI!            │
+│                            │
+└────────────────────────────┘
+                              
+"
+`;
+
+exports[`render snapshots state after keyboard interaction 1`] = `
+"┌────────────────────────────┐
+│                            │
+│ Count: 3                   │
+│                            │
+└────────────────────────────┘
+                              
+"
+`;
