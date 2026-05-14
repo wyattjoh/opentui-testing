@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { useKeyboard } from "@opentui/react";
 import { useState, type ReactNode } from "react";
 import { tmpdir } from "node:os";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { realpathSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { KeyCodes, type MockInput } from "@opentui/core/testing";
 
@@ -11,6 +12,20 @@ import { applyCwd } from "../src/cwd.js";
 import { applyEnv } from "../src/env.js";
 import { wrapInput } from "../src/input.js";
 import { flushFrames, waitForFrame } from "../src/wait.js";
+
+// Polyfill of fs.promises.mkdtempDisposable (Node >= 24.4) for runtimes that
+// don't expose it yet. Same shape: { path, [Symbol.asyncDispose] }.
+async function makeTempDir(
+  prefix: string,
+): Promise<AsyncDisposable & { path: string }> {
+  const path = await mkdtemp(prefix);
+  return {
+    path,
+    async [Symbol.asyncDispose]() {
+      await rm(path, { recursive: true, force: true });
+    },
+  };
+}
 
 function Hello(): ReactNode {
   return (
@@ -124,25 +139,21 @@ describe("render", () => {
 
   test("applies cwd override during render and restores it on dispose", async () => {
     const originalCwd = process.cwd();
-    const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-render-cwd-")));
+    await using tmp = await makeTempDir(join(tmpdir(), "otui-render-cwd-"));
+    const tmpDir = realpathSync(tmp.path);
 
-    try {
-      {
-        await using cwdDisplay = await render(<CwdDisplay />, {
-          width: tmpDir.length + 20,
-          height: 5,
-          cwd: tmpDir,
-        });
+    {
+      await using cwdDisplay = await render(<CwdDisplay />, {
+        width: tmpDir.length + 20,
+        height: 5,
+        cwd: tmpDir,
+      });
 
-        expect(cwdDisplay.captureCharFrame()).toContain(`CWD: ${tmpDir}`);
-        expect(process.cwd()).toBe(tmpDir);
-      }
-
-      expect(process.cwd()).toBe(originalCwd);
-    } finally {
-      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
-      rmSync(tmpDir, { recursive: true, force: true });
+      expect(cwdDisplay.captureCharFrame()).toContain(`CWD: ${tmpDir}`);
+      expect(process.cwd()).toBe(tmpDir);
     }
+
+    expect(process.cwd()).toBe(originalCwd);
   });
 
   test("[Symbol.asyncDispose] is callable directly for mid-scope cleanup", async () => {
@@ -175,11 +186,16 @@ describe("render", () => {
 
   test("cleanup() destroys the renderer, restores env/cwd, and is idempotent", async () => {
     const originalCwd = process.cwd();
-    const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-cleanup-")));
+    await using tmp = await makeTempDir(join(tmpdir(), "otui-cleanup-"));
+    const tmpDir = realpathSync(tmp.path);
     process.env.MODE = "outer";
 
     try {
-      const envDisplay = await render(<EnvDisplay />, {
+      // `await using` so a thrown assertion still restores env/cwd before
+      // `tmp` is disposed. The explicit cleanup() / Symbol.asyncDispose()
+      // calls below still exercise the manual path; the scope-exit disposal
+      // is one more idempotent call.
+      await using envDisplay = await render(<EnvDisplay />, {
         width: 30,
         height: 5,
         env: { MODE: "inner" },
@@ -200,9 +216,7 @@ describe("render", () => {
       expect(process.env.MODE).toBe("outer");
       expect(process.cwd()).toBe(originalCwd);
     } finally {
-      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
       delete process.env.MODE;
-      rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });
@@ -390,19 +404,15 @@ describe("applyEnv", () => {
 });
 
 describe("applyCwd", () => {
-  test("switches process.cwd() and restores it on the returned callback", () => {
+  test("switches process.cwd() and restores it on the returned callback", async () => {
     const originalCwd = process.cwd();
-    const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-apply-cwd-")));
+    await using tmp = await makeTempDir(join(tmpdir(), "otui-apply-cwd-"));
+    const tmpDir = realpathSync(tmp.path);
 
-    try {
-      const restore = applyCwd(tmpDir);
-      expect(process.cwd()).toBe(tmpDir);
+    const restore = applyCwd(tmpDir);
+    expect(process.cwd()).toBe(tmpDir);
 
-      restore();
-      expect(process.cwd()).toBe(originalCwd);
-    } finally {
-      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
-      rmSync(tmpDir, { recursive: true, force: true });
-    }
+    restore();
+    expect(process.cwd()).toBe(originalCwd);
   });
 });

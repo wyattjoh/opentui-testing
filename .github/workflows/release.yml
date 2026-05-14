@@ -5,9 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,6 +15,9 @@ jobs:
   release-please:
     name: release-please
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -32,7 +33,11 @@ jobs:
     name: publish to npm
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
+    # Must run on GitHub-hosted runner for npm OIDC trusted publishing.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 
@@ -42,8 +47,11 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -58,9 +66,7 @@ jobs:
         run: bun run build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
   update-marketplace:
     name: update marketplace
