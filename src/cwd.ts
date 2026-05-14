@@ -8,6 +8,17 @@
  * module-load time will not see the override unless the chdir happened
  * before the module's `import` line ran.
  *
+ * The input is not normalized with `realpath` before chdir, so on platforms
+ * that reach the target through symlinks (e.g. macOS `/var/folders/...`
+ * resolves to `/private/var/folders/...`), `process.cwd()` after the call
+ * may differ from the literal input string. Pre-resolve with
+ * `fs.realpathSync` if your assertions compare the literal string.
+ *
+ * `process.chdir` is process-global, so two `applyCwd` calls overlapping in
+ * time will race and leave the directory in whatever state the last restore
+ * happens to run in. Not safe for concurrent test renderers; keep tests
+ * serial when using this.
+ *
  * Typically called by {@link render} via its `cwd` option; use this
  * directly only when you are managing a renderer outside of {@link render}.
  *

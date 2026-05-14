@@ -155,6 +155,28 @@ describe("render", () => {
     await rendered[Symbol.asyncDispose]();
   });
 
+  test("restores env when applyCwd throws on a nonexistent path", async () => {
+    const originalCwd = process.cwd();
+    process.env.MODE = "outer";
+
+    try {
+      await expect(
+        render(<EnvDisplay />, {
+          width: 30,
+          height: 5,
+          env: { MODE: "inner" },
+          cwd: join(tmpdir(), "otui-does-not-exist-", String(Date.now()), "nope"),
+        }),
+      ).rejects.toThrow();
+
+      expect(process.env.MODE).toBe("outer");
+      expect(process.cwd()).toBe(originalCwd);
+    } finally {
+      if (process.cwd() !== originalCwd) process.chdir(originalCwd);
+      delete process.env.MODE;
+    }
+  });
+
   test("cleanup() destroys the renderer, restores env/cwd, and is idempotent", async () => {
     const originalCwd = process.cwd();
     const tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "otui-cleanup-")));

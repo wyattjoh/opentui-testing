@@ -34,6 +34,13 @@ export interface RenderOptions extends Partial<TestRendererOptions> {
    * `import` of the component-under-test runs. The upstream `testRender`
    * does not expose a CWD knob, so this is implemented as a process-wide
    * chdir scoped to the renderer's lifetime.
+   *
+   * The path is not normalized with `realpath` before chdir; on macOS a
+   * tmpdir at `/var/folders/...` resolves to `/private/var/folders/...`
+   * once applied. Pre-resolve with `fs.realpathSync` if your tests compare
+   * `process.cwd()` against the literal input string. Because chdir is
+   * process-global, concurrent `render()` calls with different `cwd`
+   * values will race; keep tests serial.
    */
   cwd?: string;
 }
@@ -119,35 +126,47 @@ const DEFAULT_OPTIONS: TestRendererOptions = {
  */
 export async function render(node: ReactNode, options: RenderOptions = {}): Promise<RenderResult> {
   const { env, cwd, ...rendererOptions } = options;
-  const restoreEnv = env ? applyEnv(env) : () => {};
-  const restoreCwd = cwd !== undefined ? applyCwd(cwd) : () => {};
+  let restoreEnv: () => void = () => {};
+  let restoreCwd: () => void = () => {};
 
-  const merged: TestRendererOptions = { ...DEFAULT_OPTIONS, ...rendererOptions };
-  const result = await testRender(node, merged);
+  try {
+    if (env) restoreEnv = applyEnv(env);
+    if (cwd !== undefined) restoreCwd = applyCwd(cwd);
 
-  await act(async () => {
-    await result.renderOnce();
-  });
+    const merged: TestRendererOptions = { ...DEFAULT_OPTIONS, ...rendererOptions };
+    const result = await testRender(node, merged);
 
-  let disposed = false;
-  const cleanup = async (): Promise<void> => {
-    if (disposed) return;
-    disposed = true;
     await act(async () => {
-      result.renderer.destroy();
+      await result.renderOnce();
     });
+
+    let disposed = false;
+    const cleanup = async (): Promise<void> => {
+      if (disposed) return;
+      disposed = true;
+      await act(async () => {
+        result.renderer.destroy();
+      });
+      // LIFO: cwd was applied after env, so restore it first.
+      restoreCwd();
+      restoreEnv();
+    };
+
+    const { mockInput: rawInput, ...rest } = result;
+    return {
+      ...rest,
+      input: wrapInput(rawInput),
+      flushFrames: (n: number) => flushFrames(result.renderOnce, n),
+      waitForFrame: (predicate, waitOptions) =>
+        waitForFrame(result.renderOnce, result.captureCharFrame, predicate, waitOptions),
+      cleanup,
+      [Symbol.asyncDispose]: cleanup,
+    };
+  } catch (err) {
+    // Mount failed after env/cwd were applied. Restore process-global state
+    // before propagating so subsequent tests in the worker aren't poisoned.
     restoreCwd();
     restoreEnv();
-  };
-
-  const { mockInput: rawInput, ...rest } = result;
-  return {
-    ...rest,
-    input: wrapInput(rawInput),
-    flushFrames: (n: number) => flushFrames(result.renderOnce, n),
-    waitForFrame: (predicate, waitOptions) =>
-      waitForFrame(result.renderOnce, result.captureCharFrame, predicate, waitOptions),
-    cleanup,
-    [Symbol.asyncDispose]: cleanup,
-  };
+    throw err;
+  }
 }
