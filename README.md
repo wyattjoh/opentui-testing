@@ -100,13 +100,21 @@ Returns:
 | `mockMouse` | `MockMouse` | OpenTUI mouse simulator (passed through) |
 | `resize` | `(w, h) => void` | OpenTUI resize (passed through) |
 
-### `keys`
+### Key constants
 
-The upstream `KeyCodes` plus a `SPACE` alias for convenience.
+There is no `keys` export. Import `KeyCodes` from `@opentui/core/testing`
+directly:
 
-### `waitForFrame(renderOnce, captureCharFrame, predicate, opts?)`
+```tsx
+import { KeyCodes } from "@opentui/core/testing";
 
-Standalone form for when you want to drive an existing renderer manually.
+await app.input.pressKey(KeyCodes.RETURN);
+await app.input.pressKey(" "); // space
+```
+
+Single printable characters (including space) can go through `pressKey`
+as-is; reach for `KeyCodes` for control codes and CSI/SS3 sequences
+(arrows, function keys, etc.).
 
 ## What this is not
 

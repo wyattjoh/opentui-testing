@@ -158,7 +158,7 @@ export async function render(node: ReactNode, options: RenderOptions = {}): Prom
     const { mockInput: rawInput, ...rest } = result;
     return {
       ...rest,
-      input: wrapInput(rawInput),
+      input: wrapInput(rawInput, result.renderer),
       flushFrames: (n: number) => flushFrames(result.renderOnce, n),
       waitForFrame: (predicate, waitOptions) =>
         waitForFrame(result.renderOnce, result.captureCharFrame, predicate, waitOptions),

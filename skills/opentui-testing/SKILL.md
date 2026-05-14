@@ -94,14 +94,16 @@ If a test legitimately needs to dispose mid-scope (rare), call
   process-global, so keep tests serial.
 - Anything else from `TestRendererOptions` passes straight through.
 
-Other top-level exports:
+`render` is the only top-level export worth pulling in for almost every
+test. `flushFrames` and `waitForFrame` are not separate imports; reach for
+`app.flushFrames(n)` and `app.waitForFrame(predicate, opts?)` on the result
+of `render(...)`. Those are the bound forms; they already know about
+`renderOnce` and `captureCharFrame`.
 
-- `keys` — `KeyCodes` plus `SPACE`. Prefer `keys.RETURN` over the raw `"\r"`.
-- `flushFrames`, `waitForFrame` — standalone forms if you already have a
-  renderer in hand.
-- `wrapInput` — wrap a raw `MockInput` from an externally-created renderer
-  so its methods auto-`act()`.
-- `applyEnv` — same env-override mechanism, decoupled from `render`.
+For key constants (arrows, function keys, control codes), import `KeyCodes`
+from `@opentui/core/testing` directly — this package does not re-export it.
+Single printable characters, including space, go through `pressKey(" ")`
+as-is, so there is no `SPACE` alias to reach for.
 
 ## Writing a test
 
@@ -144,10 +146,12 @@ Reach for the right assertion shape:
 `input` mirrors `MockInput`. Real-world usage:
 
 ```tsx
+import { KeyCodes } from "@opentui/core/testing";
+
 await using app = await render(<App />);
 await app.input.pressArrow("down");
 await app.input.pressArrow("down");
-await app.input.pressKey(keys.RETURN);
+await app.input.pressKey(KeyCodes.RETURN);
 await app.input.typeText("hello world");
 ```
 
@@ -339,7 +343,8 @@ offending `<box>`.
 
 ```tsx
 import { describe, expect, test } from "bun:test";
-import { render, keys, flushFrames, waitForFrame } from "@wyattjoh/opentui-testing";
+import { render } from "@wyattjoh/opentui-testing";
+import { KeyCodes } from "@opentui/core/testing";
 
 await using app = await render(<App />, {
   width: 80,
@@ -352,25 +357,27 @@ const {
   input,
   captureCharFrame,
   captureSpans,
-  waitForFrame: waitFor,
-  flushFrames: flush,
+  waitForFrame,
+  flushFrames,
   resize,
   mockMouse,
   renderer,
 } = app;
 
 await input.pressArrow("down");
-await input.pressKey(keys.RETURN);
+await input.pressKey(KeyCodes.RETURN);
+await input.pressKey(" "); // space — printable chars pass straight through
 await input.typeText("hello");
 
-await waitFor((frame) => frame.includes("hello"));
-await flush(3);
+await waitForFrame((frame) => frame.includes("hello"));
+await flushFrames(3);
 
 expect(captureCharFrame()).toMatchSnapshot();
 expect(captureCharFrame()).toContain("Saved");
 ```
 
-That is the whole working set. Reach for the underlying `@opentui/core/testing`
-and `@opentui/react/test-utils` types (re-exported from this package) when a
-test genuinely needs something this wrapper doesn't, but the cases that
-require it are rare.
+That is the whole working set. When a test genuinely needs something this
+wrapper doesn't, reach for the underlying `@opentui/core/testing` and
+`@opentui/react/test-utils` types by importing from those packages directly
+(they're peer dependencies, so already installed); this package no longer
+re-exports them.

@@ -30,7 +30,11 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=24.0.0",
     "bun": ">=1.2.0"
@@ -47,8 +51,8 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "@opentui/core": "^0.2.7",
-    "@opentui/react": "^0.2.7",
+    "@opentui/core": "^0.2.9",
+    "@opentui/react": "^0.2.9",
     "react": "^19.0.0"
   },
   "devDependencies": {
