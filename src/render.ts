@@ -56,10 +56,12 @@ type UpstreamRender = Awaited<ReturnType<typeof testRender>>;
  * sites don't have to thread `renderOnce` and `captureCharFrame` through
  * manually.
  *
- * Implements `AsyncDisposable`: use `await using rendered = await render(...)`
- * and the renderer is destroyed and any `env` / `cwd` overrides restored when
- * the binding goes out of scope. For environments that don't support `await
- * using`, call {@link RenderResult.cleanup} explicitly instead.
+ * Implements `AsyncDisposable`: use
+ * `await using app = await render(<App />, ...)` (name the binding after the
+ * root component being rendered) and the renderer is destroyed and any `env`
+ * / `cwd` overrides restored when the binding goes out of scope. For
+ * environments that don't support `await using`, call
+ * {@link RenderResult.cleanup} explicitly instead.
  */
 export type RenderResult = Omit<UpstreamRender, "mockInput"> & AsyncDisposable & {
   /**
@@ -107,17 +109,18 @@ const DEFAULT_OPTIONS: TestRendererOptions = {
  * The returned helpers (`input`, `flushFrames`, `waitForFrame`) are pre-bound
  * to this renderer so tests don't have to thread `renderOnce` and
  * `captureCharFrame` around. The result is an `AsyncDisposable`: use
- * `await using rendered = await render(...)` to destroy the renderer and
- * restore `env` / `cwd` overrides automatically when the binding leaves scope.
+ * `await using app = await render(<App />, ...)` (name the binding after the
+ * root component being rendered) to destroy the renderer and restore `env` /
+ * `cwd` overrides automatically when the binding leaves scope.
  *
  * @example
  * ```tsx
- * await using rendered = await render(<App />, {
+ * await using app = await render(<App />, {
  *   width: 80, height: 24, env: { FEATURE_FLAG: "1" }, cwd: "/tmp/fixture",
  * });
- * await rendered.input.typeText("hello");
- * await rendered.waitForFrame((frame) => frame.includes("hello"));
- * expect(rendered.captureCharFrame()).toMatchSnapshot();
+ * await app.input.typeText("hello");
+ * await app.waitForFrame((frame) => frame.includes("hello"));
+ * expect(app.captureCharFrame()).toMatchSnapshot();
  * ```
  *
  * @param node - The React element to mount.

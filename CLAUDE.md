@@ -31,7 +31,8 @@ This package is a thin layer above that. It provides:
   promises; `await` them.
 - `cleanup()` (returned from `render`) — destroys the renderer inside
   `act()` and restores any `env` / `cwd` overrides. Idempotent. Prefer
-  `await using rendered = await render(...)` in tests; reach for
+  `await using app = await render(<App />, ...)` in tests (name the
+  binding after the root component being rendered); reach for
   `cleanup()` directly only when an `afterEach` hook owns disposal or
   the runtime doesn't support `await using`. `[Symbol.asyncDispose]` is
   bound to the same callback.

@@ -41,21 +41,25 @@ import { App } from "./app.tsx";
 
 describe("App", () => {
   test("first frame", async () => {
-    await using rendered = await render(<App />);
-    expect(rendered.captureCharFrame()).toMatchSnapshot();
+    await using app = await render(<App />);
+    expect(app.captureCharFrame()).toMatchSnapshot();
   });
 });
 ```
 
+Name the binding after the root component being rendered (`<App />` → `app`,
+`<Picker />` → `picker`, etc.) so destructured calls like
+`app.captureCharFrame()` read naturally at the call site.
+
 The renderer is an async disposable. `await using` calls
-`rendered[Symbol.asyncDispose]()` at scope exit, which destroys the renderer
+`app[Symbol.asyncDispose]()` at scope exit, which destroys the renderer
 inside `act()` and restores any `env` overrides. Forget the `await using` and
 the frame loop, timers, and stdin listeners stay alive across tests; the next
 test may pass locally and fail in CI for reasons that have nothing to do with
 the code.
 
 If a test legitimately needs to dispose mid-scope (rare), call
-`await rendered[Symbol.asyncDispose]()` directly.
+`await app[Symbol.asyncDispose]()` directly.
 
 ## The API surface, in one place
 
@@ -104,17 +108,17 @@ Other top-level exports:
 The four-line skeleton:
 
 ```tsx
-await using rendered = await render(<App />);
-// interact via `rendered.input`
-// wait for state to settle via `rendered.waitForFrame`
-expect(rendered.captureCharFrame()).toMatchSnapshot();
+await using app = await render(<App />);
+// interact via `app.input`
+// wait for state to settle via `app.waitForFrame`
+expect(app.captureCharFrame()).toMatchSnapshot();
 ```
 
 If you prefer destructured names, pull them off the disposable binding:
 
 ```tsx
-await using rendered = await render(<App />);
-const { input, captureCharFrame, waitForFrame } = rendered;
+await using app = await render(<App />);
+const { input, captureCharFrame, waitForFrame } = app;
 await input.typeText("hi");
 await waitForFrame((frame) => frame.includes("hi"));
 expect(captureCharFrame()).toMatchSnapshot();
@@ -140,11 +144,11 @@ Reach for the right assertion shape:
 `input` mirrors `MockInput`. Real-world usage:
 
 ```tsx
-await using rendered = await render(<App />);
-await rendered.input.pressArrow("down");
-await rendered.input.pressArrow("down");
-await rendered.input.pressKey(keys.RETURN);
-await rendered.input.typeText("hello world");
+await using app = await render(<App />);
+await app.input.pressArrow("down");
+await app.input.pressArrow("down");
+await app.input.pressKey(keys.RETURN);
+await app.input.typeText("hello world");
 ```
 
 Every method is async. Awaiting matters: it is what lets the wrapped `act()`
@@ -155,8 +159,8 @@ After a burst of keys, the snapshot is rarely correct on the next line. Pump
 until the expected state appears:
 
 ```tsx
-await using rendered = await render(<App />);
-const { input, captureCharFrame, waitForFrame } = rendered;
+await using app = await render(<App />);
+const { input, captureCharFrame, waitForFrame } = app;
 
 await input.pressArrow("up");
 await input.pressArrow("up");
@@ -175,10 +179,10 @@ flake.
 `env` shines when the component branches on a flag:
 
 ```tsx
-await using rendered = await render(<App />, {
+await using app = await render(<App />, {
   env: { FEATURE_FLAG: "1", DEBUG: undefined },
 });
-expect(rendered.captureCharFrame()).toContain("flag on");
+expect(app.captureCharFrame()).toContain("flag on");
 ```
 
 If the flag is read at module import time (`const FLAG = process.env.FLAG;`
@@ -197,8 +201,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const fixture = realpathSync(mkdtempSync(join(tmpdir(), "fixture-")));
-await using rendered = await render(<App />, { cwd: fixture });
-expect(rendered.captureCharFrame()).toContain(fixture);
+await using app = await render(<App />, { cwd: fixture });
+expect(app.captureCharFrame()).toContain(fixture);
 ```
 
 Same module-load caveat as `env`: if `process.cwd()` is captured at import
@@ -216,8 +220,8 @@ against the literal input string (the example above does this).
 `mockMouse` and `resize` come straight from upstream. Useful for layout tests:
 
 ```tsx
-await using rendered = await render(<App />, { width: 80, height: 24 });
-const { resize, captureCharFrame, waitForFrame } = rendered;
+await using app = await render(<App />, { width: 80, height: 24 });
+const { resize, captureCharFrame, waitForFrame } = app;
 resize(40, 12);
 await waitForFrame((frame) => frame.split("\n").length <= 12);
 expect(captureCharFrame()).toMatchSnapshot();
@@ -235,11 +239,11 @@ When a test is failing in a way the snapshot doesn't make obvious, log the
 frame at each step:
 
 ```tsx
-await using rendered = await render(<App />);
-console.log("after mount:\n" + rendered.captureCharFrame());
-await rendered.input.typeText("hi");
-await rendered.waitForFrame((frame) => frame.includes("hi"));
-console.log("after type:\n" + rendered.captureCharFrame());
+await using app = await render(<App />);
+console.log("after mount:\n" + app.captureCharFrame());
+await app.input.typeText("hi");
+await app.waitForFrame((frame) => frame.includes("hi"));
+console.log("after type:\n" + app.captureCharFrame());
 ```
 
 Run with `bun test path/to/file.test.tsx`. The character grid is plain text;
@@ -269,8 +273,8 @@ actually in.
 ring not highlighting, dim text, wrong fg/bg), use `captureSpans()`:
 
 ```tsx
-await using rendered = await render(<App />);
-const frame = rendered.captureSpans();
+await using app = await render(<App />);
+const frame = app.captureSpans();
 // frame.lines[row].spans[col].fg, .bg, .attributes
 ```
 
@@ -293,8 +297,8 @@ Resize and snapshot at each interesting breakpoint:
 
 ```tsx
 for (const [w, h] of [[80, 24], [60, 20], [40, 12]]) {
-  await using rendered = await render(<App />, { width: w, height: h });
-  console.log(`${w}x${h}:\n` + rendered.captureCharFrame());
+  await using app = await render(<App />, { width: w, height: h });
+  console.log(`${w}x${h}:\n` + app.captureCharFrame());
 }
 ```
 
@@ -315,9 +319,9 @@ offending `<box>`.
   when you snapshot.
 - **Forgetting `await using`.** Without it the renderer is never disposed,
   the frame loop and stdin listeners stay alive, and the next test inherits
-  them. A plain `const rendered = await render(...)` is almost always a bug.
+  them. A plain `const app = await render(...)` is almost always a bug.
 - **Destructuring inside the `await using` declaration.** `await using { input } = await render(...)` is a syntax error today, but writing
-  `await using rendered = await render(...)` and then re-binding to a fresh
+  `await using app = await render(...)` and then re-binding to a fresh
   object also drops the disposable reference. Keep the disposable binding
   intact; destructure into separate `const`s afterwards.
 - **Module-load env reads.** `env` in `render` cannot retroactively change a
@@ -337,7 +341,7 @@ offending `<box>`.
 import { describe, expect, test } from "bun:test";
 import { render, keys, flushFrames, waitForFrame } from "@wyattjoh/opentui-testing";
 
-await using rendered = await render(<App />, {
+await using app = await render(<App />, {
   width: 80,
   height: 24,
   env: { FEATURE_FLAG: "1", LEGACY: undefined },
@@ -353,7 +357,7 @@ const {
   resize,
   mockMouse,
   renderer,
-} = rendered;
+} = app;
 
 await input.pressArrow("down");
 await input.pressKey(keys.RETURN);
