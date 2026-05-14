@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/wyattjoh/opentui-testing/compare/v1.0.0...v1.0.1) (2026-05-14)
+
+
+### Miscellaneous Chores
+
+* release 1.0.1 ([#13](https://github.com/wyattjoh/opentui-testing/issues/13)) ([848b0cd](https://github.com/wyattjoh/opentui-testing/commit/848b0cde9de5990e56ed1a141d863544ae908fef))
+
 ## [1.0.0](https://github.com/wyattjoh/opentui-testing/compare/v0.1.0...v1.0.0) (2026-05-14)
 
 
