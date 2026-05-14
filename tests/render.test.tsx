@@ -4,17 +4,13 @@ import { useState, type ReactNode } from "react";
 import { tmpdir } from "node:os";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { MockInput } from "@opentui/core/testing";
+import { KeyCodes, type MockInput } from "@opentui/core/testing";
 
-import {
-  applyCwd,
-  applyEnv,
-  flushFrames,
-  keys,
-  render,
-  waitForFrame,
-  wrapInput,
-} from "../src/index.js";
+import { render } from "../src/index.js";
+import { applyCwd } from "../src/cwd.js";
+import { applyEnv } from "../src/env.js";
+import { wrapInput } from "../src/input.js";
+import { flushFrames, waitForFrame } from "../src/wait.js";
 
 function Hello(): ReactNode {
   return (
@@ -222,16 +218,49 @@ describe("input", () => {
     expect(captureCharFrame()).toContain("count: 2");
   });
 
-  test("pressKey(keys.RETURN) emits a return key", async () => {
+  test("pressKey(KeyCodes.RETURN) emits a return key", async () => {
     await using keyLog = await render(<KeyLog />, { width: 30, height: 7 });
     const { input, captureCharFrame, waitForFrame } = keyLog;
 
-    await input.pressKey(keys.RETURN);
+    await input.pressKey(KeyCodes.RETURN);
     await waitForFrame((frame) => frame.includes("last: return"));
 
     const frame = captureCharFrame();
     expect(frame).toContain("count: 1");
     expect(frame).toContain("last: return");
+  });
+
+  test("pressEscape dispatches synchronously in legacy keyboard mode", async () => {
+    // Regression: a bare `` byte sits in the StdinParser's pending
+    // buffer for ~20ms (legacy CSI/SS3 disambiguation) before its
+    // `armTimeouts` setTimeout commits it. Without the input wrapper
+    // force-flushing that buffer after each keystroke, `waitForFrame` could
+    // outrun the timer or the timer fired its dispatch outside `act()` and
+    // produced "update was not wrapped in act" warnings. This test pins the
+    // fix in place: in default (non-kitty) mode a bare Escape must still
+    // settle inside the await.
+    await using keyLog = await render(<KeyLog />, { width: 30, height: 7 });
+    const { input, captureCharFrame, waitForFrame } = keyLog;
+
+    await input.pressEscape();
+    await waitForFrame((frame) => frame.includes("last: escape"));
+
+    expect(captureCharFrame()).toContain("count: 1");
+  });
+
+  test("pressEscape after typeText still clears within the same await", async () => {
+    // Combined case: type a few chars (each unambiguous, no pending bytes)
+    // then a bare Escape. The flush only matters for the trailing Escape,
+    // and exits the wrapper before any subsequent assertion races it.
+    await using keyLog = await render(<KeyLog />, { width: 30, height: 7 });
+    const { input, captureCharFrame, waitForFrame } = keyLog;
+
+    await input.typeText("ab");
+    await waitForFrame((frame) => frame.includes("count: 2"));
+    await input.pressEscape();
+    await waitForFrame((frame) => frame.includes("count: 3") && frame.includes("last: escape"));
+
+    expect(captureCharFrame()).toContain("last: escape");
   });
 });
 
@@ -307,14 +336,6 @@ describe("captureSpans", () => {
     expect(redSpan!.fg.r).toBeGreaterThan(0.9);
     expect(redSpan!.fg.g).toBeLessThan(0.1);
     expect(redSpan!.fg.b).toBeLessThan(0.1);
-  });
-});
-
-describe("keys", () => {
-  test("re-exports KeyCodes plus SPACE alias", () => {
-    expect(keys.ARROW_UP).toBe("\x1B[A");
-    expect(keys.RETURN).toBe("\r");
-    expect(keys.SPACE).toBe(" ");
   });
 });
 

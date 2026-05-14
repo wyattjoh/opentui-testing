@@ -4,34 +4,16 @@
  * React `act()` wrapping, frame quiescence, env overrides, and ergonomic
  * cleanup.
  *
- * Start with {@link render}. The other exports are useful when integrating
- * with an externally-managed renderer or composing custom helpers.
+ * The public surface is intentionally narrow: {@link render} and the types
+ * surfaced through its signature. The standalone helper forms (`flushFrames`,
+ * `waitForFrame`, `wrapInput`, env/cwd helpers) live under `src/` and are
+ * used internally; they are not part of the package's stable API. For key
+ * constants, import `KeyCodes` from `@opentui/core/testing` directly.
  *
  * @packageDocumentation
  */
 
 export { render, type RenderOptions, type RenderResult } from "./render.js";
-export { keys, type Key } from "./keys.js";
-export { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.js";
-export { wrapInput, type Input } from "./input.js";
-export { applyEnv, type EnvOverrides } from "./env.js";
-export { applyCwd } from "./cwd.js";
-
-/**
- * Upstream OpenTUI testing types re-exported for convenience so consumers
- * don't have to depend on `@opentui/core/testing` directly to type a
- * renderer or input reference.
- */
-export type {
-  TestRenderer,
-  TestRendererOptions,
-  MockInput,
-  MockMouse,
-} from "@opentui/core/testing";
-
-/**
- * Upstream OpenTUI frame-capture types re-exported for convenience. Returned
- * by `captureSpans()` on a {@link RenderResult}; useful when asserting on
- * color or attribute state rather than glyphs.
- */
-export type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentui/core";
+export type { Input } from "./input.js";
+export type { EnvOverrides } from "./env.js";
+export type { WaitForFrameOptions } from "./wait.js";
