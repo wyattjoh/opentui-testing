@@ -1,6 +1,6 @@
 {
   "name": "@wyattjoh/opentui-testing",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Snapshot-friendly testing helpers for OpenTUI React apps under bun test",
   "keywords": [
     "opentui",
