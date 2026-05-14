@@ -15,7 +15,7 @@ import { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.ts";
 export interface RenderOptions extends Partial<TestRendererOptions> {
   /**
    * `process.env` overrides applied before mounting the component and
-   * restored on `cleanup()`. A `string` value sets the variable, `undefined`
+   * restored on dispose. A `string` value sets the variable, `undefined`
    * unsets it for the duration of the test.
    *
    * Only catches runtime reads of `process.env.X`. Constants captured at
@@ -32,11 +32,15 @@ type UpstreamRender = Awaited<ReturnType<typeof testRender>>;
  *
  * Mirrors the upstream `testRender` result with two differences: the raw
  * `mockInput` is replaced with an `act()`-wrapped {@link Input}, and helper
- * methods (`flushFrames`, `waitForFrame`, `cleanup`) are bound to this
- * renderer so call sites don't have to thread `renderOnce` and
- * `captureCharFrame` through manually.
+ * methods (`flushFrames`, `waitForFrame`) are bound to this renderer so call
+ * sites don't have to thread `renderOnce` and `captureCharFrame` through
+ * manually.
+ *
+ * Implements `AsyncDisposable`: use `await using rendered = await render(...)`
+ * and the renderer is destroyed and any `env` overrides restored when the
+ * binding goes out of scope.
  */
-export type RenderResult = Omit<UpstreamRender, "mockInput"> & {
+export type RenderResult = Omit<UpstreamRender, "mockInput"> & AsyncDisposable & {
   /**
    * `MockInput` whose methods auto-flush React updates inside `act()`. All
    * methods are async. See {@link Input}.
@@ -57,13 +61,6 @@ export type RenderResult = Omit<UpstreamRender, "mockInput"> & {
     predicate: (frame: string) => boolean,
     options?: WaitForFrameOptions,
   ) => Promise<string>;
-  /**
-   * Destroy the underlying renderer inside `act()` and restore any `env`
-   * overrides. Always call at the end of a test (typically in `try`/`finally`
-   * or via Bun's `afterEach`); leaked renderers keep timers and the frame
-   * loop alive across tests.
-   */
-  cleanup: () => Promise<void>;
 };
 
 const DEFAULT_OPTIONS: TestRendererOptions = {
@@ -78,19 +75,20 @@ const DEFAULT_OPTIONS: TestRendererOptions = {
  * and drives one initial frame inside `act()` so `captureCharFrame()` is
  * ready to read synchronously after `await render(...)` resolves.
  *
- * The returned helpers (`input`, `flushFrames`, `waitForFrame`, `cleanup`)
- * are pre-bound to this renderer so tests don't have to thread `renderOnce`
- * and `captureCharFrame` around.
+ * The returned helpers (`input`, `flushFrames`, `waitForFrame`) are pre-bound
+ * to this renderer so tests don't have to thread `renderOnce` and
+ * `captureCharFrame` around. The result is an `AsyncDisposable`: use
+ * `await using rendered = await render(...)` to destroy the renderer and
+ * restore `env` overrides automatically when the binding leaves scope.
  *
  * @example
  * ```tsx
- * const { input, captureCharFrame, waitForFrame, cleanup } = await render(<App />, {
+ * await using rendered = await render(<App />, {
  *   width: 80, height: 24, env: { FEATURE_FLAG: "1" },
  * });
- * await input.typeText("hello");
- * await waitForFrame((frame) => frame.includes("hello"));
- * expect(captureCharFrame()).toMatchSnapshot();
- * await cleanup();
+ * await rendered.input.typeText("hello");
+ * await rendered.waitForFrame((frame) => frame.includes("hello"));
+ * expect(rendered.captureCharFrame()).toMatchSnapshot();
  * ```
  *
  * @param node - The React element to mount.
@@ -115,7 +113,7 @@ export async function render(node: ReactNode, options: RenderOptions = {}): Prom
     flushFrames: (n: number) => flushFrames(result.renderOnce, n),
     waitForFrame: (predicate, waitOptions) =>
       waitForFrame(result.renderOnce, result.captureCharFrame, predicate, waitOptions),
-    cleanup: async () => {
+    async [Symbol.asyncDispose]() {
       await act(async () => {
         result.renderer.destroy();
       });

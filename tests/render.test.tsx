@@ -66,16 +66,13 @@ function ColorText(): ReactNode {
 
 describe("render", () => {
   test("captures initial frame as snapshot", async () => {
-    const { captureCharFrame, cleanup } = await render(<Hello />, { width: 30, height: 6 });
-    expect(captureCharFrame()).toMatchSnapshot();
-    await cleanup();
+    await using rendered = await render(<Hello />, { width: 30, height: 6 });
+    expect(rendered.captureCharFrame()).toMatchSnapshot();
   });
 
   test("snapshots state after keyboard interaction", async () => {
-    const { input, captureCharFrame, waitForFrame, cleanup } = await render(<Counter />, {
-      width: 30,
-      height: 6,
-    });
+    await using rendered = await render(<Counter />, { width: 30, height: 6 });
+    const { input, captureCharFrame, waitForFrame } = rendered;
 
     expect(captureCharFrame()).toContain("Count: 0");
 
@@ -85,60 +82,59 @@ describe("render", () => {
     await waitForFrame((frame) => frame.includes("Count: 3"));
 
     expect(captureCharFrame()).toMatchSnapshot();
-    await cleanup();
   });
 
   test("exposes the underlying renderer and mockMouse passthrough", async () => {
-    const { renderer, mockMouse, cleanup } = await render(<Hello />, { width: 30, height: 6 });
-    expect(renderer).toBeDefined();
-    expect(typeof renderer.destroy).toBe("function");
-    expect(mockMouse).toBeDefined();
-    expect(typeof mockMouse.click).toBe("function");
-    expect(typeof mockMouse.moveTo).toBe("function");
-    await cleanup();
+    await using rendered = await render(<Hello />, { width: 30, height: 6 });
+    expect(rendered.renderer).toBeDefined();
+    expect(typeof rendered.renderer.destroy).toBe("function");
+    expect(rendered.mockMouse).toBeDefined();
+    expect(typeof rendered.mockMouse.click).toBe("function");
+    expect(typeof rendered.mockMouse.moveTo).toBe("function");
   });
 
-  test("applies env overrides during render and restores them on cleanup", async () => {
+  test("applies env overrides during render and restores them on dispose", async () => {
     process.env.MODE = "outer";
 
-    const { captureCharFrame, cleanup } = await render(<EnvDisplay />, {
-      width: 30,
-      height: 5,
-      env: { MODE: "inner", FEATURE_FLAG: "1" },
-    });
+    {
+      await using rendered = await render(<EnvDisplay />, {
+        width: 30,
+        height: 5,
+        env: { MODE: "inner", FEATURE_FLAG: "1" },
+      });
 
-    expect(captureCharFrame()).toContain("MODE: inner");
-    expect(process.env.MODE).toBe("inner");
-    expect(process.env.FEATURE_FLAG).toBe("1");
-
-    await cleanup();
+      expect(rendered.captureCharFrame()).toContain("MODE: inner");
+      expect(process.env.MODE).toBe("inner");
+      expect(process.env.FEATURE_FLAG).toBe("1");
+    }
 
     expect(process.env.MODE).toBe("outer");
     expect(process.env.FEATURE_FLAG).toBeUndefined();
 
     delete process.env.MODE;
   });
+
+  test("[Symbol.asyncDispose] is callable directly for mid-scope cleanup", async () => {
+    const rendered = await render(<Hello />, { width: 30, height: 6 });
+    expect(typeof rendered[Symbol.asyncDispose]).toBe("function");
+    await rendered[Symbol.asyncDispose]();
+  });
 });
 
 describe("input", () => {
   test("typeText fires one keypress per character", async () => {
-    const { input, captureCharFrame, waitForFrame, cleanup } = await render(<KeyLog />, {
-      width: 30,
-      height: 7,
-    });
+    await using rendered = await render(<KeyLog />, { width: 30, height: 7 });
+    const { input, captureCharFrame, waitForFrame } = rendered;
 
     await input.typeText("hi");
     await waitForFrame((frame) => frame.includes("count: 2"));
 
     expect(captureCharFrame()).toContain("count: 2");
-    await cleanup();
   });
 
   test("pressKey(keys.RETURN) emits a return key", async () => {
-    const { input, captureCharFrame, waitForFrame, cleanup } = await render(<KeyLog />, {
-      width: 30,
-      height: 7,
-    });
+    await using rendered = await render(<KeyLog />, { width: 30, height: 7 });
+    const { input, captureCharFrame, waitForFrame } = rendered;
 
     await input.pressKey(keys.RETURN);
     await waitForFrame((frame) => frame.includes("last: return"));
@@ -146,65 +142,48 @@ describe("input", () => {
     const frame = captureCharFrame();
     expect(frame).toContain("count: 1");
     expect(frame).toContain("last: return");
-    await cleanup();
   });
 });
 
 describe("flushFrames", () => {
   test("bound form pumps n frames and keeps the renderer alive", async () => {
-    const { flushFrames: flush, captureCharFrame, cleanup } = await render(<Hello />, {
-      width: 30,
-      height: 6,
-    });
-    await flush(3);
-    expect(captureCharFrame()).toContain("Hello, OpenTUI!");
-    await cleanup();
+    await using rendered = await render(<Hello />, { width: 30, height: 6 });
+    await rendered.flushFrames(3);
+    expect(rendered.captureCharFrame()).toContain("Hello, OpenTUI!");
   });
 
   test("standalone form drives renderOnce from an existing renderer", async () => {
-    const { renderOnce, captureCharFrame, cleanup } = await render(<Hello />, {
-      width: 30,
-      height: 6,
-    });
-    await flushFrames(renderOnce, 2);
-    expect(captureCharFrame()).toContain("Hello, OpenTUI!");
-    await cleanup();
+    await using rendered = await render(<Hello />, { width: 30, height: 6 });
+    await flushFrames(rendered.renderOnce, 2);
+    expect(rendered.captureCharFrame()).toContain("Hello, OpenTUI!");
   });
 });
 
 describe("waitForFrame", () => {
   test("standalone form pumps until predicate matches", async () => {
-    const { renderOnce, captureCharFrame, cleanup } = await render(<Counter />, {
-      width: 30,
-      height: 6,
-    });
-    const frame = await waitForFrame(renderOnce, captureCharFrame, (f) =>
+    await using rendered = await render(<Counter />, { width: 30, height: 6 });
+    const frame = await waitForFrame(rendered.renderOnce, rendered.captureCharFrame, (f) =>
       f.includes("Count: 0"),
     );
     expect(frame).toContain("Count: 0");
-    await cleanup();
   });
 
   test("throws with the last captured frame when predicate never matches", async () => {
-    const { waitForFrame: waitFor, cleanup } = await render(<Hello />, {
-      width: 30,
-      height: 6,
-    });
+    await using rendered = await render(<Hello />, { width: 30, height: 6 });
 
     await expect(
-      waitFor((frame) => frame.includes("not present"), { timeoutMs: 50, maxFrames: 4 }),
+      rendered.waitForFrame((frame) => frame.includes("not present"), {
+        timeoutMs: 50,
+        maxFrames: 4,
+      }),
     ).rejects.toThrow(/predicate did not match.*Hello, OpenTUI!/s);
-
-    await cleanup();
   });
 });
 
 describe("resize", () => {
   test("resize shrinks the captured frame dimensions", async () => {
-    const { resize, captureCharFrame, waitForFrame, cleanup } = await render(<Hello />, {
-      width: 80,
-      height: 24,
-    });
+    await using rendered = await render(<Hello />, { width: 80, height: 24 });
+    const { resize, captureCharFrame, waitForFrame } = rendered;
 
     const beforeWidth = captureCharFrame().split("\n")[0]!.length;
     expect(beforeWidth).toBeGreaterThanOrEqual(80);
@@ -218,15 +197,14 @@ describe("resize", () => {
     const after = captureCharFrame();
     expect(after.split("\n")[0]!.length).toBeLessThanOrEqual(30);
     expect(after).toContain("Hello, OpenTUI!");
-    await cleanup();
   });
 });
 
 describe("captureSpans", () => {
   test("returns per-cell color information for styled text", async () => {
-    const { captureSpans, cleanup } = await render(<ColorText />, { width: 10, height: 3 });
+    await using rendered = await render(<ColorText />, { width: 10, height: 3 });
 
-    const frame = captureSpans();
+    const frame = rendered.captureSpans();
     expect(frame.cols).toBe(10);
     expect(frame.rows).toBe(3);
     expect(frame.lines.length).toBe(3);
@@ -239,7 +217,6 @@ describe("captureSpans", () => {
     expect(redSpan!.fg.r).toBeGreaterThan(0.9);
     expect(redSpan!.fg.g).toBeLessThan(0.1);
     expect(redSpan!.fg.b).toBeLessThan(0.1);
-    await cleanup();
   });
 });
 

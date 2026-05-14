@@ -26,11 +26,12 @@ import { App } from "./app.tsx";
 
 describe("App", () => {
   test("captures state after interaction", async () => {
-    const { input, captureCharFrame, waitForFrame, cleanup } = await render(<App />, {
+    await using rendered = await render(<App />, {
       width: 80,
       height: 24,
       env: { FEATURE_FLAG: "1" },
     });
+    const { input, captureCharFrame, waitForFrame } = rendered;
 
     await input.pressArrow("down");
     await input.pressArrow("down");
@@ -38,11 +39,14 @@ describe("App", () => {
     await waitForFrame((frame) => frame.includes("hello"));
 
     expect(captureCharFrame()).toMatchSnapshot();
-
-    await cleanup();
   });
 });
 ```
+
+`render` returns an `AsyncDisposable`. `await using` calls
+`[Symbol.asyncDispose]()` when the binding leaves scope, which destroys the
+renderer inside `act()` and restores any `env` overrides. To dispose manually
+(rarely needed), call `await rendered[Symbol.asyncDispose]()` directly.
 
 ## API
 
@@ -57,7 +61,7 @@ Options:
 | --- | --- | --- | --- |
 | `width` | `number` | `80` | Terminal columns |
 | `height` | `number` | `24` | Terminal rows |
-| `env` | `Record<string, string \| undefined>` | `undefined` | Overrides `process.env.X` for the test; `undefined` unsets. Restored on `cleanup()`. Only catches runtime reads, not module-load reads. |
+| `env` | `Record<string, string \| undefined>` | `undefined` | Overrides `process.env.X` for the test; `undefined` unsets. Restored on dispose. Only catches runtime reads, not module-load reads. |
 | ...rest | `TestRendererOptions` | | Anything `@opentui/core/testing#TestRendererOptions` accepts |
 
 Returns:
@@ -71,7 +75,7 @@ Returns:
 | `renderOnce` | `() => Promise<void>` | Drive a single frame (not act-wrapped) |
 | `flushFrames` | `(n: number) => Promise<void>` | Drive N frames, each wrapped in `act()` |
 | `waitForFrame` | `(predicate, opts?) => Promise<string>` | Pump frames until `predicate(captureCharFrame())` returns truthy or `timeoutMs`/`maxFrames` exceeded |
-| `cleanup` | `() => Promise<void>` | Destroys renderer inside `act()` and restores any `env` overrides. Always call at the end of a test. |
+| `[Symbol.asyncDispose]` | `() => Promise<void>` | Destroys renderer inside `act()` and restores any `env` overrides. Called automatically by `await using`. |
 | `mockMouse` | `MockMouse` | OpenTUI mouse simulator (passed through) |
 | `resize` | `(w, h) => void` | OpenTUI resize (passed through) |
 
