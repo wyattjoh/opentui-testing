@@ -56,8 +56,8 @@
     "react": "^19.0.0"
   },
   "devDependencies": {
-    "@opentui/core": "0.2.9",
-    "@opentui/react": "0.2.9",
+    "@opentui/core": "0.2.10",
+    "@opentui/react": "0.2.10",
     "@types/bun": "latest",
     "@types/react": "19.2.14",
     "react": "19.2.6",
