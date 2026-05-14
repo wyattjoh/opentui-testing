@@ -82,6 +82,12 @@ If a test legitimately needs to dispose mid-scope (rare), call
   test and restores on dispose. `undefined` means "unset". Only catches
   runtime reads; if the component reads env at module-load time, set it
   before the `import` of the component (top of file, before the import line).
+- `cwd`: `string`. Calls `process.chdir()` for the renderer's lifetime and
+  restores the prior directory on dispose. Same module-load caveat as `env`.
+  Not realpath-normalized, so on macOS `/var/folders/...` tmpdirs resolve to
+  `/private/var/folders/...` once applied; pre-resolve with `fs.realpathSync`
+  if assertions compare the literal input string. `process.chdir` is
+  process-global, so keep tests serial.
 - Anything else from `TestRendererOptions` passes straight through.
 
 Other top-level exports:
@@ -179,6 +185,31 @@ If the flag is read at module import time (`const FLAG = process.env.FLAG;`
 at the top of the file), `render`'s `env` is too late. Either refactor the
 component to read at runtime, or set `process.env` before the `import` line
 of the component-under-test and reset it in `afterEach`.
+
+### Cwd
+
+`cwd` is useful when the component-under-test resolves paths relative to the
+process working directory:
+
+```tsx
+import { realpathSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const fixture = realpathSync(mkdtempSync(join(tmpdir(), "fixture-")));
+await using rendered = await render(<App />, { cwd: fixture });
+expect(rendered.captureCharFrame()).toContain(fixture);
+```
+
+Same module-load caveat as `env`: if `process.cwd()` is captured at import
+time, `render`'s `cwd` is too late. Either refactor to read at runtime, or
+`process.chdir(...)` before the `import` line of the component-under-test
+and reset it in `afterEach`. `process.chdir` is process-global, so two
+`render()` calls overlapping in time will race; keep tests serial when
+using `cwd`. The path is not normalized with `realpath` before chdir; on
+macOS, tmpdirs at `/var/folders/...` resolve to `/private/var/folders/...`
+once applied, so pre-resolve with `fs.realpathSync` if assertions compare
+against the literal input string (the example above does this).
 
 ### Mouse and resize
 
@@ -310,6 +341,7 @@ await using rendered = await render(<App />, {
   width: 80,
   height: 24,
   env: { FEATURE_FLAG: "1", LEGACY: undefined },
+  cwd: "/tmp/fixture",
 });
 
 const {

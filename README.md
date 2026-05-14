@@ -30,6 +30,7 @@ describe("App", () => {
       width: 80,
       height: 24,
       env: { FEATURE_FLAG: "1" },
+      cwd: "/tmp/fixture",
     });
     const { input, captureCharFrame, waitForFrame } = rendered;
 
@@ -45,8 +46,9 @@ describe("App", () => {
 
 `render` returns an `AsyncDisposable`. `await using` calls
 `[Symbol.asyncDispose]()` when the binding leaves scope, which destroys the
-renderer inside `act()` and restores any `env` overrides. To dispose manually
-(rarely needed), call `await rendered[Symbol.asyncDispose]()` directly.
+renderer inside `act()` and restores any `env` / `cwd` overrides. To dispose
+manually (e.g. from an `afterEach` hook, or in environments without `await
+using`), call `await rendered.cleanup()`. Both forms are idempotent.
 
 ## API
 
@@ -62,6 +64,7 @@ Options:
 | `width` | `number` | `80` | Terminal columns |
 | `height` | `number` | `24` | Terminal rows |
 | `env` | `Record<string, string \| undefined>` | `undefined` | Overrides `process.env.X` for the test; `undefined` unsets. Restored on dispose. Only catches runtime reads, not module-load reads. |
+| `cwd` | `string` | `undefined` | `process.chdir()` for the renderer's lifetime; restored on dispose. Only catches runtime reads of `process.cwd()`. Not realpath-normalized (macOS tmpdirs resolve through `/private`). `process.chdir` is process-global, so keep tests serial. |
 | ...rest | `TestRendererOptions` | | Anything `@opentui/core/testing#TestRendererOptions` accepts |
 
 Returns:
@@ -75,7 +78,8 @@ Returns:
 | `renderOnce` | `() => Promise<void>` | Drive a single frame (not act-wrapped) |
 | `flushFrames` | `(n: number) => Promise<void>` | Drive N frames, each wrapped in `act()` |
 | `waitForFrame` | `(predicate, opts?) => Promise<string>` | Pump frames until `predicate(captureCharFrame())` returns truthy or `timeoutMs`/`maxFrames` exceeded |
-| `[Symbol.asyncDispose]` | `() => Promise<void>` | Destroys renderer inside `act()` and restores any `env` overrides. Called automatically by `await using`. |
+| `cleanup` | `() => Promise<void>` | Destroys renderer inside `act()` and restores any `env` / `cwd` overrides. Idempotent. Use this in `afterEach` or when `await using` isn't available. |
+| `[Symbol.asyncDispose]` | `() => Promise<void>` | Same callback as `cleanup`; called automatically by `await using`. |
 | `mockMouse` | `MockMouse` | OpenTUI mouse simulator (passed through) |
 | `resize` | `(w, h) => void` | OpenTUI resize (passed through) |
 

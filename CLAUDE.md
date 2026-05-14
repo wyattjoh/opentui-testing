@@ -15,17 +15,26 @@ This package is a thin layer above that. It provides:
 - `render(node, options?)` — `testRender` with sensible defaults (80x24)
   and built-in initial flush so the first frame is ready synchronously.
   Accepts an `env` map (`{ FOO: "bar", FEATURE: undefined }`) that mutates
-  `process.env` before mount and restores prior values during `cleanup()`.
+  `process.env` before mount and restores prior values on dispose.
   `undefined` means "unset that variable for the duration of the test".
   Caveat: this only helps for runtime `process.env.X` reads. If the
   component-under-test reads env at module import time, set it before the
-  `import` itself runs.
+  `import` itself runs. Also accepts a `cwd` string that calls
+  `process.chdir()` for the renderer's lifetime and restores the prior
+  directory on dispose; same module-load caveat applies. `cwd` is not
+  realpath-normalized (on macOS, `/var/folders/...` tmpdirs resolve to
+  `/private/var/folders/...`), and `process.chdir` is process-global, so
+  keep tests serial when relying on it.
 - `input` (returned from `render`) — a wrapped `MockInput` whose methods
   (`pressKey`, `pressArrow`, `typeText`, etc.) auto-flush React updates
   inside `act()` so tests don't emit stray warnings. All methods return
   promises; `await` them.
 - `cleanup()` (returned from `render`) — destroys the renderer inside
-  `act()`. Always call at the end of a test.
+  `act()` and restores any `env` / `cwd` overrides. Idempotent. Prefer
+  `await using rendered = await render(...)` in tests; reach for
+  `cleanup()` directly only when an `afterEach` hook owns disposal or
+  the runtime doesn't support `await using`. `[Symbol.asyncDispose]` is
+  bound to the same callback.
 - `keys` — the upstream `KeyCodes` plus a `space` alias.
 - `flushFrames(renderOnce, n)` — drive N frames manually, wrapped in `act()`.
 - `waitForFrame(renderOnce, captureCharFrame, predicate, opts)` — drive
