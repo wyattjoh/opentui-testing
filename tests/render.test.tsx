@@ -14,7 +14,7 @@ import {
   render,
   waitForFrame,
   wrapInput,
-} from "../src/index.ts";
+} from "../src/index.js";
 
 function Hello(): ReactNode {
   return (

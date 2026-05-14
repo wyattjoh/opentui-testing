@@ -22,22 +22,29 @@
     "url": "https://github.com/wyattjoh/opentui-testing/issues"
   },
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
-  "files": ["src", "README.md", "LICENSE"],
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=24.0.0",
+    "bun": ">=1.2.0"
+  },
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
   "scripts": {
     "test": "bun test",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "build": "bun run clean && tsc -p tsconfig.build.json",
+    "prepack": "bun run build"
   },
   "peerDependencies": {
     "@opentui/core": "^0.2.7",

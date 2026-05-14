@@ -10,12 +10,12 @@
  * @packageDocumentation
  */
 
-export { render, type RenderOptions, type RenderResult } from "./render.ts";
-export { keys, type Key } from "./keys.ts";
-export { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.ts";
-export { wrapInput, type Input } from "./input.ts";
-export { applyEnv, type EnvOverrides } from "./env.ts";
-export { applyCwd } from "./cwd.ts";
+export { render, type RenderOptions, type RenderResult } from "./render.js";
+export { keys, type Key } from "./keys.js";
+export { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.js";
+export { wrapInput, type Input } from "./input.js";
+export { applyEnv, type EnvOverrides } from "./env.js";
+export { applyCwd } from "./cwd.js";
 
 /**
  * Upstream OpenTUI testing types re-exported for convenience so consumers

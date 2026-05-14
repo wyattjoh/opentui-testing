@@ -55,14 +55,38 @@ across a minor version, pin tighter.
 
 ## Conventions
 
-- Bun + TypeScript, no build step. Consumers import from `./src/index.ts`
-  via the `exports` map; this is a source-only package.
+- Bun + TypeScript in development; published as compiled JS in `dist/`.
+  Source lives in `src/` and uses canonical `./foo.js` imports so the
+  same paths work in dev (Bundler resolution) and after `tsc` emit.
+- The published `exports` map points at `./dist/index.js` (+ `.d.ts`).
+  Consumers never import from `src/`; only `dist/`, `README.md`, and
+  `LICENSE` ship in the tarball.
 - React JSX via `jsxImportSource: "@opentui/react"`, matching the
   primary consumer (`agent-toolkit`).
 - Tests live in `tests/`. Smoke test uses a small fixture component that
   mirrors the `<box>`/`<text>` patterns the consumer uses; do not import
-  from sibling repos.
+  from sibling repos. Tests still import the source via
+  `../src/index.js` so they exercise the un-emitted code.
 - No em dashes anywhere in code, docs, or commit messages.
+
+## Build
+
+- `bun run build` runs `tsc -p tsconfig.build.json` after a clean, emitting
+  `.js` + `.d.ts` (with sourcemaps and declaration maps) into `dist/`.
+- `prepack` is wired to `bun run build`, so `bun pm pack` and `npm publish`
+  always ship a fresh build; no need to remember to run it manually.
+- `bun run check` keeps using `tsc --noEmit` against the main `tsconfig.json`
+  for development typechecking.
+- `tsconfig.build.json` switches `module`/`moduleResolution` to `NodeNext`,
+  turns on declaration + sourcemap emit, sets `rootDir: ./src`, and
+  excludes `tests/`. The base config keeps `moduleResolution: Bundler`
+  for dev so the same `.ts` files load under Bun without rewriting.
+- `engines.node` is `>=24.0.0` and `engines.bun` is `>=1.2.0`. Node 24
+  is the first release where `await using` works unflagged; Bun has
+  supported explicit resource management since well before 1.2. Both
+  fields are advisory under npm (warnings, not errors) but document the
+  intended floor so consumers don't try to use `await using` on a
+  runtime that won't parse it.
 
 ## Linking during development
 
@@ -79,10 +103,11 @@ cd ~/Code/github.com/wyattjoh/agent-toolkit/cli
 bun install --force
 ```
 
-The tarball is gitignored. After any change in `src/`, repack and reinstall.
-Don't use `bun link` for this consumer: linking carries this package's own
-`node_modules/react` along, causing the "Invalid hook call / two React
-copies" error.
+`bun pm pack` triggers `prepack`, which runs `bun run build` and writes
+a fresh `dist/`. The tarball is gitignored; `dist/` is gitignored too.
+After any change in `src/`, repack and reinstall. Don't use `bun link`
+for this consumer: linking carries this package's own `node_modules/react`
+along, causing the "Invalid hook call / two React copies" error.
 
 ## Anti-scope
 

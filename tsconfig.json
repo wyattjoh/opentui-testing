@@ -10,7 +10,6 @@
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
     "types": ["bun", "node"]
   },
   "include": ["src/**/*", "tests/**/*"]

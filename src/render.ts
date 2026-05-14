@@ -2,10 +2,10 @@ import { testRender } from "@opentui/react/test-utils";
 import type { TestRendererOptions } from "@opentui/core/testing";
 import { act, type ReactNode } from "react";
 
-import { applyCwd } from "./cwd.ts";
-import { applyEnv, type EnvOverrides } from "./env.ts";
-import { wrapInput, type Input } from "./input.ts";
-import { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.ts";
+import { applyCwd } from "./cwd.js";
+import { applyEnv, type EnvOverrides } from "./env.js";
+import { wrapInput, type Input } from "./input.js";
+import { flushFrames, waitForFrame, type WaitForFrameOptions } from "./wait.js";
 
 /**
  * Options accepted by {@link render}.
