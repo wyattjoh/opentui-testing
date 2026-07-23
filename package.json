@@ -59,8 +59,8 @@
     "@opentui/core": "0.2.9",
     "@opentui/react": "0.2.9",
     "@types/bun": "latest",
-    "@types/react": "19.2.14",
-    "react": "19.2.6",
+    "@types/react": "19.2.17",
+    "react": "19.2.8",
     "typescript": "^6.0.3"
   }
 }
